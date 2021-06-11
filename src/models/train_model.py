@@ -14,6 +14,7 @@ def train(train_loader, model, svi, n_epochs, kl_factor, test_loader):
     running_loss = 0.0
     eval_every = 100
     steps = 0
+    counter = 0
 
     for epoch in range(n_epochs):
         for images, labels in train_loader:
@@ -27,6 +28,14 @@ def train(train_loader, model, svi, n_epochs, kl_factor, test_loader):
                 model.eval()
                 test_acc = test(test_loader, model, guide)
                 print(f"[Epoch {epoch}] Loss: {running_loss/eval_every:.5} Test accuracy: {test_acc:.4} ")
+                checkpoint = {
+                    'hidden_size' : model.hidden_size,
+                    'n_classes' : 10,
+                    'state_dict': model.state_dict()
+                }
+                torch.save(checkpoint, 'models/checkpoint'+str(counter)+'.pth')
+                counter += 1
+                running_loss = 0
                 model.train()
 
 
@@ -35,9 +44,13 @@ def train(train_loader, model, svi, n_epochs, kl_factor, test_loader):
 def test(test_loader, model, guide):
     metric = torchmetrics.Accuracy()
     predictive_dist = Predictive(model, guide=guide, num_samples=100, return_sites=['_RETURN'])
+    counter = 0
     for images, labels in test_loader:
         test_samples = predictive_dist(images)
         acc = metric(torch.argmax((test_samples['_RETURN']).mean(dim=0), dim=-1), labels)
+        counter += 1
+        if counter == 10:
+            break
     acc = metric.compute()
     return acc
 
